@@ -23,6 +23,7 @@ pub struct HyprlandMonitor {
     pub dpms_status: bool,
     #[serde(rename = "vrr")]
     pub vrr: bool,
+    pub disabled: bool,
     #[serde(rename = "availableModes")]
     pub available_modes: Vec<String>,
 }
@@ -62,7 +63,7 @@ impl HyprlandBackend {
     }
 
     pub fn list_monitors(&self) -> Result<Vec<HyprlandMonitor>> {
-        let output = self.run_hyprctl(&["monitors", "-j"])?;
+        let output = self.run_hyprctl(&["monitors", "all", "-j"])?;
         let monitors: Vec<HyprlandMonitor> = serde_json::from_str(&output)
             .context("Failed to parse monitor list from hyprctl")?;
         Ok(monitors)

@@ -52,7 +52,7 @@ fn run() -> anyhow::Result<()> {
         })
         .collect();
 
-    if selected_monitor.dpms_status {
+    if !selected_monitor.disabled {
         action_options.push("Disable monitor".to_string());
     } else {
         action_options.push("Enable monitor".to_string());
