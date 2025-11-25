@@ -7,7 +7,7 @@ A launcher-driven monitor manager for Hyprland, allowing you to manage monitor c
 - List all connected monitors with their current status
 - View and apply all supported resolutions and refresh rates
 - Enable/disable monitors
-- Integration with popular launchers (walker, rofi, dmenu, fuzzel)
+- Integration with popular launchers (walker, rofi, dmenu, fuzzel, vicinae)
 - Clean two-stage menu interface
 
 ## Requirements
@@ -18,6 +18,7 @@ A launcher-driven monitor manager for Hyprland, allowing you to manage monitor c
   - rofi
   - dmenu
   - fuzzel
+  - vicinae
 
 ## Installation
 
@@ -51,6 +52,7 @@ monitormenu
 monitormenu --launcher rofi
 monitormenu --launcher dmenu
 monitormenu --launcher fuzzel
+monitormenu --launcher vicinae
 ```
 
 ### Workflow

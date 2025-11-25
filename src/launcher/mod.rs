@@ -8,6 +8,7 @@ pub enum Launcher {
     Rofi,
     Dmenu,
     Fuzzel,
+    Vicinae,
 }
 
 impl Launcher {
@@ -44,6 +45,14 @@ impl Launcher {
                     args.push(p.to_string());
                 }
                 ("fuzzel".to_string(), args)
+            }
+            Launcher::Vicinae => {
+                let mut args = vec!["dmenu".to_string()];
+                if let Some(p) = prompt {
+                    args.push("--placeholder".to_string());
+                    args.push(p.to_string());
+                }
+                ("vicinae".to_string(), args)
             }
         }
     }
@@ -89,6 +98,7 @@ impl std::str::FromStr for Launcher {
             "rofi" => Ok(Launcher::Rofi),
             "dmenu" => Ok(Launcher::Dmenu),
             "fuzzel" => Ok(Launcher::Fuzzel),
+            "vicinae" => Ok(Launcher::Vicinae),
             _ => Err(anyhow::anyhow!("Unknown launcher: {}", s)),
         }
     }
@@ -101,6 +111,7 @@ impl std::fmt::Display for Launcher {
             Launcher::Rofi => write!(f, "rofi"),
             Launcher::Dmenu => write!(f, "dmenu"),
             Launcher::Fuzzel => write!(f, "fuzzel"),
+            Launcher::Vicinae => write!(f, "vicinae"),
         }
     }
 }

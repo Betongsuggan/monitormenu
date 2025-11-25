@@ -16,6 +16,7 @@ pub enum CliLauncher {
     Rofi,
     Dmenu,
     Fuzzel,
+    Vicinae,
 }
 
 impl From<CliLauncher> for Launcher {
@@ -25,6 +26,7 @@ impl From<CliLauncher> for Launcher {
             CliLauncher::Rofi => Launcher::Rofi,
             CliLauncher::Dmenu => Launcher::Dmenu,
             CliLauncher::Fuzzel => Launcher::Fuzzel,
+            CliLauncher::Vicinae => Launcher::Vicinae,
         }
     }
 }
