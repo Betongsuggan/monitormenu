@@ -2,7 +2,7 @@ pub mod backend;
 pub mod cli;
 pub mod launcher;
 
-use backend::{HyprlandMonitor, Mode};
+use backend::{Mode, Monitor};
 
 #[derive(Debug, Clone)]
 pub enum Action {
@@ -36,12 +36,12 @@ impl Action {
     }
 }
 
-pub fn format_monitor_for_display(monitor: &HyprlandMonitor) -> String {
-    let status_icon = if monitor.dpms_status { "✓" } else { "✗" };
+pub fn format_monitor_for_display(monitor: &Monitor) -> String {
+    let status_icon = if monitor.enabled { "✓" } else { "✗" };
     let focused_icon = if monitor.focused { "●" } else { " " };
 
     format!(
-        "{} {} {} - {}x{}@{:.2}Hz ({})",
+        "{} {} {} - {}x{}@{:.3}Hz ({})",
         status_icon,
         focused_icon,
         monitor.description,
@@ -55,12 +55,12 @@ pub fn format_monitor_for_display(monitor: &HyprlandMonitor) -> String {
 pub fn format_mode_for_display(mode: &Mode, current_width: i32, current_height: i32, current_refresh: f32) -> String {
     let is_current = mode.width == current_width
         && mode.height == current_height
-        && (mode.refresh_rate - current_refresh).abs() < 0.01;
+        && (mode.refresh_rate - current_refresh).abs() < 0.001;
 
     let marker = if is_current { "●" } else { " " };
 
     format!(
-        "{} Set: {}x{} @ {:.2} Hz",
+        "{} Set: {}x{} @ {:.3} Hz",
         marker, mode.width, mode.height, mode.refresh_rate
     )
 }

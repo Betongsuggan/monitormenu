@@ -1,6 +1,6 @@
 use clap::Parser;
 use monitormenu::{
-    backend::HyprlandBackend, cli::Cli, format_mode_for_display, format_monitor_for_display,
+    backend::create_backend, cli::Cli, format_mode_for_display, format_monitor_for_display,
     parse_monitor_name_from_selection, Action,
 };
 
@@ -14,7 +14,7 @@ fn main() {
 fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let launcher: monitormenu::launcher::Launcher = cli.launcher.into();
-    let backend = HyprlandBackend::new();
+    let backend = create_backend(cli.backend.into())?;
 
     let monitors = backend.list_monitors()?;
 
@@ -38,9 +38,8 @@ fn run() -> anyhow::Result<()> {
         .find(|m| m.name == monitor_name)
         .ok_or_else(|| anyhow::anyhow!("Selected monitor not found"))?;
 
-    let parsed_modes = HyprlandBackend::parse_modes(&selected_monitor.available_modes);
-
-    let mut action_options: Vec<String> = parsed_modes
+    let mut action_options: Vec<String> = selected_monitor
+        .available_modes
         .iter()
         .map(|mode| {
             format_mode_for_display(
@@ -52,7 +51,7 @@ fn run() -> anyhow::Result<()> {
         })
         .collect();
 
-    if !selected_monitor.disabled {
+    if selected_monitor.enabled {
         action_options.push("Disable monitor".to_string());
     } else {
         action_options.push("Enable monitor".to_string());

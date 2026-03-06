@@ -2,6 +2,8 @@ use anyhow::{Context, Result};
 use serde::Deserialize;
 use std::process::Command;
 
+use super::common::{Backend, Mode, Monitor};
+
 #[derive(Debug, Deserialize, Clone)]
 pub struct HyprlandMonitor {
     pub id: i32,
@@ -34,13 +36,6 @@ pub struct WorkspaceInfo {
     pub name: String,
 }
 
-#[derive(Debug, Clone)]
-pub struct Mode {
-    pub width: i32,
-    pub height: i32,
-    pub refresh_rate: f32,
-}
-
 pub struct HyprlandBackend;
 
 impl HyprlandBackend {
@@ -62,14 +57,14 @@ impl HyprlandBackend {
         Ok(String::from_utf8(output.stdout)?)
     }
 
-    pub fn list_monitors(&self) -> Result<Vec<HyprlandMonitor>> {
+    fn list_hyprland_monitors(&self) -> Result<Vec<HyprlandMonitor>> {
         let output = self.run_hyprctl(&["monitors", "all", "-j"])?;
         let monitors: Vec<HyprlandMonitor> = serde_json::from_str(&output)
             .context("Failed to parse monitor list from hyprctl")?;
         Ok(monitors)
     }
 
-    pub fn parse_modes(mode_strings: &[String]) -> Vec<Mode> {
+    fn parse_modes(mode_strings: &[String]) -> Vec<Mode> {
         mode_strings
             .iter()
             .filter_map(|s| {
@@ -95,8 +90,43 @@ impl HyprlandBackend {
             })
             .collect()
     }
+}
 
-    pub fn set_monitor_mode(&self, monitor: &str, width: i32, height: i32, refresh: f32) -> Result<()> {
+impl Default for HyprlandBackend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Backend for HyprlandBackend {
+    fn list_monitors(&self) -> Result<Vec<Monitor>> {
+        let hypr_monitors = self.list_hyprland_monitors()?;
+
+        let monitors = hypr_monitors
+            .into_iter()
+            .map(|m| {
+                let available_modes = Self::parse_modes(&m.available_modes);
+
+                Monitor {
+                    name: m.name,
+                    description: m.description,
+                    width: m.width,
+                    height: m.height,
+                    refresh_rate: m.refresh_rate,
+                    x: m.x,
+                    y: m.y,
+                    scale: m.scale,
+                    focused: m.focused,
+                    enabled: !m.disabled,
+                    available_modes,
+                }
+            })
+            .collect();
+
+        Ok(monitors)
+    }
+
+    fn set_monitor_mode(&self, monitor: &str, width: i32, height: i32, refresh: f32) -> Result<()> {
         let mode_str = format!("{}x{}@{:.2}", width, height, refresh);
         let monitor_config = format!("{},{},auto,1", monitor, mode_str);
 
@@ -106,21 +136,19 @@ impl HyprlandBackend {
         Ok(())
     }
 
-    pub fn enable_monitor(&self, monitor: &str) -> Result<()> {
+    fn enable_monitor(&self, monitor: &str) -> Result<()> {
         self.run_hyprctl(&["keyword", "monitor", &format!("{},preferred,auto,1", monitor)])
             .context("Failed to enable monitor")?;
         Ok(())
     }
 
-    pub fn disable_monitor(&self, monitor: &str) -> Result<()> {
+    fn disable_monitor(&self, monitor: &str) -> Result<()> {
         self.run_hyprctl(&["keyword", "monitor", &format!("{},disable", monitor)])
             .context("Failed to disable monitor")?;
         Ok(())
     }
-}
 
-impl Default for HyprlandBackend {
-    fn default() -> Self {
-        Self::new()
+    fn name(&self) -> &'static str {
+        "hyprland"
     }
 }

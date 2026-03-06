@@ -1,5 +1,5 @@
 {
-  description = "Launcher-driven monitor manager for Hyprland";
+  description = "Launcher-driven monitor manager for Wayland compositors";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -20,7 +20,7 @@
           extensions = [ "rust-src" "rust-analyzer" ];
         };
 
-        runtimeDeps = with pkgs; [ hyprland ];
+        runtimeDeps = with pkgs; [ hyprland niri ];
 
         buildInputs = with pkgs; [ rustToolchain ] ++ runtimeDeps;
 
@@ -43,7 +43,7 @@
           '';
 
           meta = with pkgs.lib; {
-            description = "Launcher-driven monitor manager for Hyprland";
+            description = "Launcher-driven monitor manager for Wayland compositors";
             license = licenses.gpl3;
             maintainers = [ ];
             platforms = platforms.linux;
