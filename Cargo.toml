@@ -3,7 +3,7 @@ name = "monitormenu"
 version = "0.1.0"
 edition = "2021"
 authors = ["monitormenu contributors"]
-description = "Launcher-driven monitor manager for Hyprland"
+description = "Launcher-driven monitor manager for Wayland compositors"
 license = "GPL-3.0"
 
 [dependencies]
