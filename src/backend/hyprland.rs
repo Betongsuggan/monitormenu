@@ -136,8 +136,10 @@ impl Backend for HyprlandBackend {
         Ok(())
     }
 
+    // Re-enabled outputs get their highest resolution at its highest refresh
+    // rate, not the EDID-preferred mode (often 60 Hz)
     fn enable_monitor(&self, monitor: &str) -> Result<()> {
-        self.run_hyprctl(&["keyword", "monitor", &format!("{},preferred,auto,1", monitor)])
+        self.run_hyprctl(&["keyword", "monitor", &format!("{},highres,auto,1", monitor)])
             .context("Failed to enable monitor")?;
         Ok(())
     }
