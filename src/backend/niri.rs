@@ -3,7 +3,8 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::process::Command;
 
-use super::common::{Backend, Mode, Monitor};
+use super::common::{Backend, Capabilities, Mode, Monitor, OutputConfig};
+use crate::fmt_num;
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
@@ -62,16 +63,50 @@ impl NiriBackend {
         Ok(String::from_utf8(output.stdout)?)
     }
 
-    fn parse_modes(niri_modes: &[NiriMode]) -> Vec<Mode> {
-        niri_modes
-            .iter()
-            .map(|m| Mode {
-                width: m.width as i32,
-                height: m.height as i32,
-                refresh_rate: m.refresh_rate as f32 / 1000.0,
-            })
-            .collect()
+    fn output_msg(&self, name: &str, args: &[&str]) -> Result<()> {
+        let mut all = vec!["output", name];
+        all.extend_from_slice(args);
+        self.run_niri_msg(&all)
+            .with_context(|| format!("Failed to run niri msg {}", all.join(" ")))?;
+        Ok(())
     }
+}
+
+fn to_mode(m: &NiriMode) -> Mode {
+    Mode {
+        width: m.width as i32,
+        height: m.height as i32,
+        refresh_rate: m.refresh_rate as f32 / 1000.0,
+    }
+}
+
+/// niri's IPC transform (`Normal`, `_90`, `Flipped270`, ...) as a wl_output
+/// transform number
+fn parse_transform(s: &str) -> u8 {
+    let rotation = if s.contains("270") {
+        3
+    } else if s.contains("180") {
+        2
+    } else if s.contains("90") {
+        1
+    } else {
+        0
+    };
+    rotation + if s.starts_with("Flipped") { 4 } else { 0 }
+}
+
+/// A wl_output transform number as a `niri msg output transform` argument
+fn transform_arg(t: u8) -> &'static str {
+    [
+        "normal",
+        "90",
+        "180",
+        "270",
+        "flipped",
+        "flipped-90",
+        "flipped-180",
+        "flipped-270",
+    ][(t % 8) as usize]
 }
 
 impl Default for NiriBackend {
@@ -83,70 +118,106 @@ impl Default for NiriBackend {
 impl Backend for NiriBackend {
     fn list_monitors(&self) -> Result<Vec<Monitor>> {
         let output = self.run_niri_msg(&["--json", "outputs"])?;
-        let outputs: HashMap<String, NiriOutput> = serde_json::from_str(&output)
-            .context("Failed to parse output list from niri msg")?;
+        let outputs: HashMap<String, NiriOutput> =
+            serde_json::from_str(&output).context("Failed to parse output list from niri msg")?;
 
-        let monitors = outputs
+        let mut monitors: Vec<Monitor> = outputs
             .into_iter()
             .map(|(connector, output)| {
-                let description = format!("{} {}", output.make, output.model);
-
-                let (width, height, refresh_rate) = output
+                let mode = output
                     .current_mode
                     .and_then(|idx| output.modes.get(idx))
-                    .map(|m| (m.width as i32, m.height as i32, m.refresh_rate as f32 / 1000.0))
-                    .unwrap_or((0, 0, 0.0));
-
-                let (x, y, scale) = output
-                    .logical
-                    .as_ref()
-                    .map(|l| (l.x, l.y, l.scale as f32))
-                    .unwrap_or((0, 0, 1.0));
-
-                let enabled = output.logical.is_some();
-                let available_modes = Self::parse_modes(&output.modes);
+                    .map(to_mode)
+                    .unwrap_or(Mode {
+                        width: 0,
+                        height: 0,
+                        refresh_rate: 0.0,
+                    });
+                let logical = output.logical.as_ref();
 
                 Monitor {
                     name: connector,
-                    description,
-                    width,
-                    height,
-                    refresh_rate,
-                    x,
-                    y,
-                    scale,
+                    description: format!("{} {}", output.make, output.model),
                     focused: false,
-                    enabled,
-                    available_modes,
+                    config: OutputConfig {
+                        enabled: logical.is_some(),
+                        mode,
+                        x: logical.map_or(0, |l| l.x),
+                        y: logical.map_or(0, |l| l.y),
+                        scale: logical.map_or(1.0, |l| l.scale as f32),
+                        transform: logical.map_or(0, |l| parse_transform(&l.transform)),
+                        vrr: output.vrr_enabled,
+                        hdr: false,
+                        bitdepth: None,
+                        sdr_brightness: None,
+                        sdr_saturation: None,
+                        mirror_of: None,
+                    },
+                    available_modes: output.modes.iter().map(to_mode).collect(),
                 }
             })
             .collect();
+        monitors.sort_by(|a, b| a.name.cmp(&b.name));
 
         Ok(monitors)
     }
 
-    fn set_monitor_mode(&self, monitor: &str, width: i32, height: i32, refresh: f32) -> Result<()> {
-        let mode_str = format!("{}x{}@{:.3}", width, height, refresh);
+    // One `niri msg output` call per field that changed
+    fn apply(&self, monitor: &Monitor, config: &OutputConfig) -> Result<()> {
+        let (old, new, name) = (&monitor.config, config, monitor.name.as_str());
 
-        self.run_niri_msg(&["output", monitor, "mode", &mode_str])
-            .context("Failed to set monitor mode")?;
-
+        if !new.enabled {
+            return self.output_msg(name, &["off"]);
+        }
+        if !old.enabled {
+            return self.output_msg(name, &["on"]);
+        }
+        if new.mode != old.mode {
+            let mode = format!(
+                "{}x{}@{:.3}",
+                new.mode.width, new.mode.height, new.mode.refresh_rate
+            );
+            self.output_msg(name, &["mode", &mode])?;
+        }
+        if new.scale != old.scale {
+            self.output_msg(name, &["scale", &fmt_num(new.scale)])?;
+        }
+        if new.transform != old.transform {
+            self.output_msg(name, &["transform", transform_arg(new.transform)])?;
+        }
+        if (new.x, new.y) != (old.x, old.y) {
+            let (x, y) = (new.x.to_string(), new.y.to_string());
+            self.output_msg(name, &["position", "set", &x, &y])?;
+        }
+        if new.vrr != old.vrr {
+            self.output_msg(name, &["vrr", if new.vrr { "on" } else { "off" }])?;
+        }
         Ok(())
     }
 
-    fn enable_monitor(&self, monitor: &str) -> Result<()> {
-        self.run_niri_msg(&["output", monitor, "on"])
-            .context("Failed to enable monitor")?;
-        Ok(())
-    }
-
-    fn disable_monitor(&self, monitor: &str) -> Result<()> {
-        self.run_niri_msg(&["output", monitor, "off"])
-            .context("Failed to disable monitor")?;
-        Ok(())
+    // niri has no HDR and no output mirroring
+    fn capabilities(&self) -> Capabilities {
+        Capabilities {
+            hdr: false,
+            mirror: false,
+        }
     }
 
     fn name(&self) -> &'static str {
         "niri"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn transforms_round_trip() {
+        for (ipc, n) in [("Normal", 0), ("_90", 1), ("_270", 3), ("Flipped180", 6)] {
+            assert_eq!(parse_transform(ipc), n);
+        }
+        assert_eq!(transform_arg(1), "90");
+        assert_eq!(transform_arg(7), "flipped-270");
     }
 }

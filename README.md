@@ -5,14 +5,25 @@ A launcher-driven monitor manager for Hyprland, allowing you to manage monitor c
 ## Features
 
 - List all connected monitors with their current status
-- View and apply all supported resolutions and refresh rates
-- Enable/disable monitors
-- Integration with popular launchers (walker, rofi, dmenu, fuzzel, vicinae)
-- Clean two-stage menu interface
+- Per monitor, change and see the current value of:
+  - resolution and refresh rate
+  - scale (1, 1.25, 1.5, 1.6, 2)
+  - rotation
+  - placement: extend right of / left of / above / below another monitor, or mirror it (Hyprland)
+  - VRR
+  - HDR (Hyprland; switches to 10-bit colour)
+  - enable / disable (the last lit monitor can't be disabled)
+- Every change keeps the monitor's other settings: the whole output state is read back and applied, never a partial rule
+- After each change the menu returns with the new state, so several changes need no restart
+- "Show as Nix" copies the monitor's current state as a nix-home `my.window-manager.monitors.<name>` entry (and shows it in a notification), to make a runtime setup permanent
+- Hyprland and niri backends; walker, rofi, dmenu, fuzzel and vicinae launchers
+
+Changes are runtime-only: a compositor reload goes back to its config.
 
 ## Requirements
 
-- Hyprland compositor
+- Hyprland or niri
+- `wl-copy` and `notify-send` for "Show as Nix" (bundled by the Nix package)
 - One of the supported launchers:
   - walker (default)
   - rofi
@@ -58,10 +69,9 @@ monitormenu --launcher vicinae
 ### Workflow
 
 1. Run `monitormenu`
-2. Select a monitor from the first menu
-3. Choose an action from the second menu:
-   - Apply a resolution and refresh rate
-   - Enable or disable the monitor
+2. Select a monitor
+3. Pick a setting (entries ending in ▸ open a list, with ● on the current value); toggles apply at once
+4. The settings menu comes back with the new state; press Escape to finish
 
 ## Monitor Display Format
 

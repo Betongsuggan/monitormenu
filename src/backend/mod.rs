@@ -2,7 +2,7 @@ pub mod common;
 pub mod hyprland;
 pub mod niri;
 
-pub use common::{Backend, Mode, Monitor};
+pub use common::{Backend, Capabilities, Mode, Monitor, OutputConfig};
 pub use hyprland::HyprlandBackend;
 pub use niri::NiriBackend;
 

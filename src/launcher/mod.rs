@@ -57,7 +57,9 @@ impl Launcher {
         }
     }
 
-    pub fn show_menu(&self, options: &[String], prompt: Option<&str>) -> Result<String> {
+    /// Show `options` and return the index of the chosen one; None when the
+    /// menu is dismissed
+    pub fn choose(&self, options: &[String], prompt: Option<&str>) -> Result<Option<usize>> {
         let (cmd, args) = self.get_command(prompt);
 
         let mut child = Command::new(&cmd)
@@ -74,18 +76,14 @@ impl Launcher {
         }
 
         let output = child.wait_with_output()?;
-
+        // Launchers exit non-zero when dismissed
         if !output.status.success() {
-            anyhow::bail!("Launcher exited with error");
+            return Ok(None);
         }
 
-        let selection = String::from_utf8(output.stdout)?.trim().to_string();
-
-        if selection.is_empty() {
-            anyhow::bail!("No selection made");
-        }
-
-        Ok(selection)
+        let selection = String::from_utf8(output.stdout)?;
+        let selection = selection.trim();
+        Ok(options.iter().position(|o| o.trim() == selection))
     }
 }
 
